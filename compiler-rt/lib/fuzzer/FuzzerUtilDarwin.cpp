@@ -11,6 +11,7 @@
 #if LIBFUZZER_APPLE
 #include "FuzzerCommand.h"
 #include "FuzzerIO.h"
+#include "FuzzerInternal.h"
 #include <TargetConditionals.h>
 #include <mutex>
 #include <signal.h>
@@ -158,6 +159,14 @@ int ExecuteCommand(const Command &Cmd) {
         ProcessStatus = -1;
     }
   }
+  // Decode the wait status as the Linux implementation does: callers compare
+  // the result against exit codes, and -fork passes it to exit().
+  if (ProcessStatus == -1)
+    return ProcessStatus;
+  if (WIFEXITED(ProcessStatus))
+    return WEXITSTATUS(ProcessStatus);
+  if (WIFSIGNALED(ProcessStatus) && WTERMSIG(ProcessStatus) == SIGINT)
+    return Fuzzer::InterruptExitCode();
   return ProcessStatus;
 }
 
